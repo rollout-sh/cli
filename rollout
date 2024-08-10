@@ -9,8 +9,8 @@ use Rollout\Service\ConfigService;
 use Rollout\Service\AuthService;
 use Rollout\Command\RegisterCommand;
 use Rollout\Command\LoginCommand;
+use Rollout\Command\WhoamiCommand;
 use Rollout\Service\ApiClientService;
-use Rollout\Service\DeploymentService;
 
 $configService = new ConfigService;
 $authService = new AuthService($configService);
@@ -20,5 +20,7 @@ $application = new Application;
 $application->add(new RegisterCommand($configService, $apiClientService));
 $application->add(new LoginCommand($configService, $apiClientService));
 $application->add(new DeployCommand($configService, $apiClientService));
+$application->add(new WhoamiCommand($configService, $apiClientService));
+$application->setDefaultCommand('deploy');
 
 $application->run();
