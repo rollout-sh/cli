@@ -9,9 +9,10 @@ const showToken = require('./src/commands/token');
 
 const { createApp, listApps, deleteApp, associateApp } = require('./src/commands/apps');
 
-
 const deploy = require('./src/commands/deploy');
 const listDeployments = require('./src/commands/deployments');
+
+const { addDomain, listDomains, removeDomain }  = require('./src/commands/domains');
 
 
 program.command('login').description('Log in to Rollout').action(login);
@@ -27,6 +28,12 @@ program.command('apps:associate').description('Associate a directory with an app
 
 program.command('deploy').description('Deploy static files to an app').action(deploy);
 program.command('deployments:list').description('List all deployments').action(listDeployments);
+
+program.command('domains:add').description('Add a custom domain').action(addDomain);
+program.command('domains:list').description('List custom domains').action(listDomains);
+program.command('domains:remove').description('Remove a custom domain').action(removeDomain);
+
+
 
 
 program.parse(process.argv);
