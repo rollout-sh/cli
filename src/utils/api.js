@@ -5,6 +5,9 @@ const axios = require('axios');
 const apiClient = axios.create({
     baseURL: 'https://app.rollout.sh.test/api/v1',
     timeout: 5000,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 

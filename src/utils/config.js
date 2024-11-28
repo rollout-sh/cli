@@ -1,16 +1,29 @@
-const fs = require('fs');
-const path = require('path');
+const { saveToFile, loadFromFile, deleteFile } = require('./storage');
 
-const configPath = path.join(__dirname, '../../config.json');
+const TOKEN_FILE = 'config.json';
 
-const saveToken = (token) => {
-  fs.writeFileSync(configPath, JSON.stringify({ token }, null, 2));
+// Save token to local storage
+const saveToken = (token, email) => {
+    saveToFile(TOKEN_FILE, { token, email });
+    console.log('Token saved successfully!');
 };
 
+// Load token from local storage
 const getToken = () => {
-  if (!fs.existsSync(configPath)) return null;
-  const { token } = JSON.parse(fs.readFileSync(configPath));
-  return token;
+    const config = loadFromFile(TOKEN_FILE);
+    return config ? config.token : null;
 };
 
-module.exports = { saveToken, getToken };
+// Load user email
+const getEmail = () => {
+    const config = loadFromFile(TOKEN_FILE);
+    return config ? config.email : null;
+};
+
+// Delete token
+const clearToken = () => {
+    deleteFile(TOKEN_FILE);
+    console.log('Logged out successfully. Token cleared.');
+};
+
+module.exports = { saveToken, getToken, getEmail, clearToken };

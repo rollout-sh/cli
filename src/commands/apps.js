@@ -1,5 +1,7 @@
 const inquirer = require('inquirer').default;
 const apiClient = require('../utils/api');
+const { saveApps, loadApps } = require('../utils/storage');
+
 
 const createApp = async () => {
     const answers = await inquirer.prompt([
@@ -16,15 +18,27 @@ const createApp = async () => {
     }
 };
 
+
+
 const listApps = async () => {
     try {
         const response = await apiClient.get('/apps');
+        saveApps(response.data); // Cache apps locally
         console.log('Your Apps:');
         response.data.forEach((app, index) => {
             console.log(`${index + 1}. Name: ${app.name}, Subdomain: ${app.subdomain}`);
         });
     } catch (error) {
         console.error('Failed to list apps:', error.response?.data?.message || error.message);
+        console.log('Fetching cached data...');
+        const cachedApps = loadApps();
+        if (cachedApps.length === 0) {
+            console.log('No cached data available.');
+        } else {
+            cachedApps.forEach((app, index) => {
+                console.log(`${index + 1}. Name: ${app.name}, Subdomain: ${app.subdomain}`);
+            });
+        }
     }
 };
 
