@@ -1,6 +1,6 @@
 {
   "name": "@rolloutsh/cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "The official CLI for Rollout",
   "main": "index.js",
   "scripts": {
@@ -17,7 +17,11 @@
     "url": "https://github.com/rollout-sh/cli/issues"
   },
   "homepage": "https://rollout.sh",
-  "keywords": ["cli", "rollout", "deployment"],
+  "keywords": [
+    "cli",
+    "rollout",
+    "deployment"
+  ],
   "author": "Neeraj Kumar",
   "license": "MIT",
   "dependencies": {
