@@ -2,7 +2,6 @@ const inquirer = require('inquirer').default;
 const apiClient = require('../utils/api');
 const { saveApps, loadApps } = require('../utils/storage');
 
-
 const createApp = async () => {
     const answers = await inquirer.prompt([
         { type: 'input', name: 'name', message: 'App Name:' },
@@ -55,4 +54,43 @@ const deleteApp = async () => {
     }
 };
 
-module.exports = { createApp, listApps, deleteApp };
+
+const associateApp = async () => {
+    
+    const apps = loadApps();
+
+    if (apps.length === 0) {
+        console.log('No apps found to associate.');
+        console.log('Please create an app first using "rollout apps:create".');
+        return;
+    }
+
+    const answers = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'app',
+            message: 'Select the app to associate:',
+            choices: apps.map((app) => ({ name: app.name, value: app })),
+        },
+        {
+            type: 'input',
+            name: 'directory',
+            message: 'Path to the project directory:',
+            default: process.cwd(),
+        },
+    ]);
+
+    // Update the selected app's directory
+    const updatedApps = apps.map((app) => {
+        if (app.id === answers.app.id) {
+            return { ...app, directory: answers.directory };
+        }
+        return app;
+    });
+
+    saveApps(updatedApps);
+    console.log(`App "${answers.app.name}" is now associated with directory: ${answers.directory}`);
+};
+
+
+module.exports = { createApp, listApps, deleteApp, associateApp };

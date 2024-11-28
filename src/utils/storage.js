@@ -13,17 +13,30 @@ const DEPLOYMENTS_FILE = 'deployments.json';
 const ensureBaseDir = () => {
     if (!fs.existsSync(baseDir)) {
         fs.mkdirSync(baseDir, { recursive: true });
-        console.log(`Created directory: ${baseDir}`);
+        console.log(`Created directory: ${baseDir}`); // Debugging line
+    } else {
+        console.log(`Directory already exists: ${baseDir}`); // Debugging line
     }
 };
 
 // Get the path to a specific file in .rollout
-const getFilePath = (filename) => path.join(baseDir, filename);
+const getFilePath = (filename) => {
+    const filePath = path.join(baseDir, filename);
+    console.log(`Resolved file path: ${filePath}`); // Debugging line
+    return filePath;
+};
+
 
 // Save data to a specific file
 const saveToFile = (filename, data) => {
-    ensureBaseDir();
-    fs.writeFileSync(getFilePath(filename), JSON.stringify(data, null, 2), { mode: 0o600 });
+    try {
+        ensureBaseDir();
+        const filePath = getFilePath(filename);
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), { mode: 0o600 });
+        console.log(`File saved successfully to: ${filePath}`);
+    } catch (error) {
+        console.error('Error saving file:', error.message);
+    }
 };
 
 // Load data from a specific file
@@ -44,7 +57,11 @@ const deleteFile = (filename) => {
 
 
 // Save apps metadata to local storage
-const saveApps = (apps) => saveToFile(APPS_FILE, { apps });
+const saveApps = (apps) => {
+    console.log('Saving apps to apps.json:', apps); // Debugging line
+    saveToFile(APPS_FILE, { apps });
+};
+
 
 // Load apps metadata from local storage
 const loadApps = () => {
