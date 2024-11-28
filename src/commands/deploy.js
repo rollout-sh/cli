@@ -102,4 +102,60 @@ const deploy = async () => {
     }
 };
 
-module.exports = deploy;
+const rollbackDeployment = async () => {
+    const apps = loadApps();
+    const currentDir = process.cwd();
+
+    const associatedApp = apps.find((app) => app.directory === currentDir);
+
+    if (!associatedApp) {
+        console.error(
+            'No app is associated with this directory. Use "rollout apps:associate" to link this directory to an app.'
+        );
+        return;
+    }
+
+    const answers = await inquirer.prompt([
+        { type: 'input', name: 'version', message: 'Version to roll back to:' },
+    ]);
+
+    try {
+        const response = await apiClient.post(`/apps/${associatedApp.id}/rollback`, {
+            version: answers.version,
+        });
+        console.log(`Rolled back to version ${answers.version} successfully!`);
+        console.log(`URL: ${response.data.url}`);
+    } catch (error) {
+        console.error('Rollback failed:', error.response?.data?.message || error.message);
+    }
+};
+
+const deploymentStatus = async () => {
+    const apps = loadApps();
+    const currentDir = process.cwd();
+
+    const associatedApp = apps.find((app) => app.directory === currentDir);
+
+    if (!associatedApp) {
+        console.error(
+            'No app is associated with this directory. Use "rollout apps:associate" to link this directory to an app.'
+        );
+        return;
+    }
+
+    try {
+        const response = await apiClient.get(`/apps/${associatedApp.id}/status`);
+        console.log('Deployment Status:');
+        response.data.forEach((deployment) => {
+            console.log(`Version: ${deployment.version}`);
+            console.log(`Status: ${deployment.status}`);
+            console.log(`Active: ${deployment.is_active}`);
+            console.log('---');
+        });
+    } catch (error) {
+        console.error('Failed to fetch deployment status:', error.response?.data?.message || error.message);
+    }
+};
+
+
+module.exports = { rollbackDeployment, deploy, deploymentStatus };
