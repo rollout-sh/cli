@@ -1,3 +1,9 @@
+## 1.1.1 (2024-11-28)
+
+### Fix
+
+- fixed issues in environment handling
+
 ## 1.1.0 (2024-11-28)
 
 ### Feat
