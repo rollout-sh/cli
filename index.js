@@ -14,6 +14,8 @@ const listDeployments = require('./src/commands/deployments');
 
 const { addDomain, listDomains, removeDomain }  = require('./src/commands/domains');
 
+const { billing, upgradePlan, addPaymentMethod, retryIncompletePayment } = require('./src/commands/billing');
+
 
 program.command('login').description('Log in to Rollout').action(login);
 program.command('register').description('Register a new account').action(register);
@@ -37,6 +39,10 @@ program.command('domains:add').description('Add a custom domain').action(addDoma
 program.command('domains:list').description('List custom domains').action(listDomains);
 program.command('domains:remove').description('Remove a custom domain').action(removeDomain);
 
+program.command('billing:status').description('View billing status').action(billing);
+program.command('billing:payment-method').description('Add a new payment method').action(addPaymentMethod);
+program.command('billing:retry-incomplete').description('Retry incomplete payments').action(retryIncompletePayment);
+program.command('billing:upgrade').description('Upgrade to a new plan').action(upgradePlan);
 
 
 
