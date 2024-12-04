@@ -4,14 +4,14 @@ const path = require('path');
 const micromatch = require('micromatch');
 const inquirer = require('inquirer').default;
 const { loadApps } = require('../utils/storage');
-const apiClient = require('../utils/api');
-const { exit } = require('process');
+const { apiClient } = require('../utils/api');
+const { setDebug, debugLog } = require('../utils/debug');
 
-// Function to parse .rolloutignore file
+
 const parseIgnoreFile = (dirPath) => {
     const ignorePath = path.join(dirPath, '.rolloutignore');
     if (!fs.existsSync(ignorePath)) {
-        console.log('No .rolloutignore file found.');
+        debugLog('No .rolloutignore file found.');
         return [];
     }
 
@@ -19,10 +19,10 @@ const parseIgnoreFile = (dirPath) => {
         const patterns = fs.readFileSync(ignorePath, 'utf8')
             .split('\n')
             .map((line) => line.trim())
-            .filter((line) => line && !line.startsWith('#')) // Ignore empty lines and comments
-            .map((pattern) => (pattern.endsWith('/') ? `${pattern}**` : pattern)); // Normalize directory patterns
+            .filter((line) => line && !line.startsWith('#'))
+            .map((pattern) => (pattern.endsWith('/') ? `${pattern}**` : pattern));
 
-        console.log('Parsed .rolloutignore:', patterns); // Debugging line
+        debugLog('Parsed .rolloutignore:', patterns);
         return patterns;
     } catch (error) {
         console.error(`Error reading .rolloutignore: ${error.message}`);
@@ -30,32 +30,28 @@ const parseIgnoreFile = (dirPath) => {
     }
 };
 
-// Function to collect files, respecting ignore patterns
 const collectFiles = (dirPath, basePath = '', ignorePatterns = []) => {
     const files = [];
     const items = fs.readdirSync(dirPath);
 
     items.forEach((item) => {
         const itemPath = path.join(dirPath, item);
-        const relativePath = path.posix.join(basePath, item); // Normalize to POSIX-style for consistency
+        const relativePath = path.posix.join(basePath, item);
 
-        // Debugging: Show every path being evaluated
-        console.log(`Checking: ${relativePath}`);
+        debugLog(`Checking: ${relativePath}`);
 
-        // Skip ignored patterns
         if (micromatch.isMatch(relativePath, ignorePatterns)) {
-            console.log(`Ignoring: ${relativePath}`);
+            debugLog(`Ignoring: ${relativePath}`);
             return;
         }
 
         if (fs.lstatSync(itemPath).isDirectory()) {
-            // Recursively collect files from subdirectories, passing ignorePatterns
-            console.log(`Entering directory: ${relativePath}`);
+            debugLog(`Entering directory: ${relativePath}`);
             files.push(...collectFiles(itemPath, relativePath, ignorePatterns));
         } else {
             try {
                 const content = fs.readFileSync(itemPath, 'utf8');
-                console.log(`Including: ${relativePath}`);
+                debugLog(`Including: ${relativePath}`);
                 files.push({ path: relativePath, content });
             } catch (error) {
                 console.error(`Error reading file ${itemPath}: ${error.message}`);
@@ -66,7 +62,9 @@ const collectFiles = (dirPath, basePath = '', ignorePatterns = []) => {
     return files;
 };
 
-const deploy = async () => {
+const deploy = async (options) => {
+    if (options.debug) setDebug(true);
+
     const apps = loadApps();
     const currentDir = process.cwd();
 
@@ -84,16 +82,16 @@ const deploy = async () => {
 
     console.log(`Collected ${files.length} files for deployment.`);
 
-    // Step 1: Initialize deployment
+    // Initialize deployment
     try {
         const initResponse = await apiClient.post(`/apps/${associatedApp.id}/deploy/init`, { total_files: files.length });
-        console.log('Deployment initialized successfully.');
+        debugLog('Deployment initialized successfully:', initResponse.data);
     } catch (error) {
         console.error('Failed to initialize deployment:', error.response?.data?.message || error.message);
         return;
     }
 
-    // Step 2: Upload files
+    // Upload files
     const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
     progressBar.start(files.length, 0);
 
@@ -110,12 +108,12 @@ const deploy = async () => {
         return;
     }
 
-    // Step 3: Monitor deployment status
+    // Monitor deployment status
     const deploymentBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
     deploymentBar.start(100, 0);
 
     let deploymentComplete = false;
-    const maxAttempts = 30; // Limit polling to 30 attempts (e.g., 1 minute with 2-second intervals)
+    const maxAttempts = 30;
     let attempts = 0;
 
     while (!deploymentComplete && attempts < maxAttempts) {
@@ -124,8 +122,7 @@ const deploy = async () => {
             const { status, progress } = statusResponse.data;
 
             deploymentBar.update(progress);
-
-            console.log(status, progress);
+            debugLog('Deployment status:', { status, progress });
 
             if (status === 'deployed') {
                 deploymentComplete = true;
@@ -138,12 +135,12 @@ const deploy = async () => {
                 console.error('Deployment failed.');
             } else {
                 attempts++;
-                await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
+                await new Promise((resolve) => setTimeout(resolve, 2000));
             }
         } catch (error) {
             deploymentBar.stop();
             console.error('Error checking deployment status:', error.response?.data?.message || error.message);
-            deploymentComplete = true; // Exit loop on error
+            deploymentComplete = true;
         }
     }
 

@@ -2,6 +2,7 @@ const { getToken } = require('./config');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const path = require('path');
+const { debugLog, setDebug } = require('./debug'); // Import debug utilities
 
 // Determine environment (default to 'production' if undefined)
 const env = process.env.NODE_ENV || 'production';
@@ -11,28 +12,24 @@ const dotenvPath = path.resolve(process.cwd(), `.env.${env}`);
 const result = dotenv.config({ path: dotenvPath });
 
 if (result.error) {
-    // Log only in non-production environments
     if (env !== 'production') {
         console.error(`⚠️  Failed to load environment file: ${dotenvPath}`);
         console.error(result.error.message);
     }
 } else {
     if (env !== 'production') {
-        console.log(`✅ Loaded environment configuration from: ${dotenvPath}`);
+        debugLog(`✅ Loaded environment configuration from: ${dotenvPath}`);
     }
 }
 
-console.log(env);
+debugLog(`Environment: ${env}`);
 
 // Fallback for `API_URL`
 const API_URL = process.env.API_URL || (env === 'production'
     ? 'https://app.rollout.sh/api/v1'
     : 'https://app.rollout.sh.test/api/v1');
 
-// Log API_URL in non-production environments for debugging
-if (env !== 'production') {
-    console.log(`Using API URL: ${API_URL}`);
-}
+debugLog(`Using API URL: ${API_URL}`);
 
 // Create Axios client
 const apiClient = axios.create({
@@ -46,7 +43,7 @@ const apiClient = axios.create({
 // Add Authorization header dynamically
 apiClient.interceptors.request.use((config) => {
     const token = getToken();
-    console.log('Using token:', token);
+    debugLog('Using token:', token);
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     } else if (env !== 'production') {
@@ -59,13 +56,19 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
-        console.error(`⚠️  API Request Failed: ${error.message}`);
+        debugLog(`⚠️  API Request Failed: ${error.message}`);
         if (error.response) {
-            console.error(`Status: ${error.response.status}`);
-            console.error(`Response: ${JSON.stringify(error.response.data, null, 2)}`);
+            debugLog(`Status: ${error.response.status}`);
+            debugLog(`Response: ${JSON.stringify(error.response.data, null, 2)}`);
         }
         return Promise.reject(error);
     }
 );
 
-module.exports = apiClient;
+// Function to set debug mode
+const initializeApiClient = (options) => {
+    if (options.debug) setDebug(true);
+    debugLog('API client initialized with debug mode.');
+};
+
+module.exports = { apiClient, initializeApiClient };
