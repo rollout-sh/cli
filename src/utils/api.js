@@ -46,6 +46,7 @@ const apiClient = axios.create({
 // Add Authorization header dynamically
 apiClient.interceptors.request.use((config) => {
     const token = getToken();
+    console.log('Using token:', token);
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     } else if (env !== 'production') {

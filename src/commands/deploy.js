@@ -1,67 +1,64 @@
+const cliProgress = require('cli-progress');
 const fs = require('fs');
 const path = require('path');
-const apiClient = require('../utils/api');
+const micromatch = require('micromatch');
 const inquirer = require('inquirer').default;
 const { loadApps } = require('../utils/storage');
+const apiClient = require('../utils/api');
+const { exit } = require('process');
 
-const { saveDeployments, loadDeployments } = require('../utils/storage');
+// Function to parse .rolloutignore file
+const parseIgnoreFile = (dirPath) => {
+    const ignorePath = path.join(dirPath, '.rolloutignore');
+    if (!fs.existsSync(ignorePath)) {
+        console.log('No .rolloutignore file found.');
+        return [];
+    }
 
-// const deploy = async () => {
-//     const answers = await inquirer.prompt([
-//         { type: 'input', name: 'app', message: 'App Name or ID:' },
-//         { type: 'input', name: 'directory', message: 'Path to static files:' },
-//     ]);
+    try {
+        const patterns = fs.readFileSync(ignorePath, 'utf8')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line && !line.startsWith('#')) // Ignore empty lines and comments
+            .map((pattern) => (pattern.endsWith('/') ? `${pattern}**` : pattern)); // Normalize directory patterns
 
-//     const files = [];
-//     const dirPath = path.resolve(answers.directory);
+        console.log('Parsed .rolloutignore:', patterns); // Debugging line
+        return patterns;
+    } catch (error) {
+        console.error(`Error reading .rolloutignore: ${error.message}`);
+        return [];
+    }
+};
 
-//     fs.readdirSync(dirPath).forEach((file) => {
-//         const filePath = path.join(dirPath, file);
-//         files.push({
-//             path: file,
-//             content: fs.readFileSync(filePath, 'utf8'),
-//         });
-//     });
-
-//     try {
-//         const response = await apiClient.post(`/apps/${answers.app}/deploy`, { files });
-
-//         // Cache deployment metadata
-//         const deployments = loadDeployments();
-//         deployments.push({
-//             app_id: answers.app,
-//             deployment_id: response.data.deployment.id,
-//             status: response.data.deployment.status,
-//             url: response.data.url,
-//             timestamp: new Date().toISOString(),
-//         });
-//         saveDeployments(deployments);
-
-//         console.log('Deployment successful!');
-//         console.log(`URL: ${response.data.url}`);
-//     } catch (error) {
-//         console.error('Deployment failed:', error.response?.data?.message || error.message);
-//     }
-// };
-
-
-const collectFiles = (dirPath, basePath = '') => {
+// Function to collect files, respecting ignore patterns
+const collectFiles = (dirPath, basePath = '', ignorePatterns = []) => {
     const files = [];
     const items = fs.readdirSync(dirPath);
 
     items.forEach((item) => {
         const itemPath = path.join(dirPath, item);
-        const relativePath = path.join(basePath, item);
+        const relativePath = path.posix.join(basePath, item); // Normalize to POSIX-style for consistency
+
+        // Debugging: Show every path being evaluated
+        console.log(`Checking: ${relativePath}`);
+
+        // Skip ignored patterns
+        if (micromatch.isMatch(relativePath, ignorePatterns)) {
+            console.log(`Ignoring: ${relativePath}`);
+            return;
+        }
 
         if (fs.lstatSync(itemPath).isDirectory()) {
-            // Recursively collect files from subdirectories
-            files.push(...collectFiles(itemPath, relativePath));
+            // Recursively collect files from subdirectories, passing ignorePatterns
+            console.log(`Entering directory: ${relativePath}`);
+            files.push(...collectFiles(itemPath, relativePath, ignorePatterns));
         } else {
             try {
                 const content = fs.readFileSync(itemPath, 'utf8');
+                console.log(`Including: ${relativePath}`);
                 files.push({ path: relativePath, content });
             } catch (error) {
-                console.error(`Error reading file ${itemPath}:`, error.message);
+                console.error(`Error reading file ${itemPath}: ${error.message}`);
             }
         }
     });
@@ -69,39 +66,94 @@ const collectFiles = (dirPath, basePath = '') => {
     return files;
 };
 
-
 const deploy = async () => {
     const apps = loadApps();
     const currentDir = process.cwd();
 
-    // Detect associated app
     const associatedApp = apps.find((app) => app.directory === currentDir);
 
     if (!associatedApp) {
-        console.error(
-            'No app is associated with this directory. Use "rollout apps:associate" to link this directory to an app.'
-        );
+        console.error('No app is associated with this directory. Use "rollout apps:associate" to link this directory to an app.');
         return;
     }
 
     console.log(`Detected app: ${associatedApp.name}`);
 
-    // Collect all files from the current directory
-    const files = collectFiles(currentDir);
-    console.log('Collected files for deployment:', files); // Debugging line
+    const ignorePatterns = parseIgnoreFile(currentDir);
+    const files = collectFiles(currentDir, '', ignorePatterns);
 
-    console.log('Payload being sent to API:', { files });
+    console.log(`Collected ${files.length} files for deployment.`);
 
+    // Step 1: Initialize deployment
+    try {
+        const initResponse = await apiClient.post(`/apps/${associatedApp.id}/deploy/init`, { total_files: files.length });
+        console.log('Deployment initialized successfully.');
+    } catch (error) {
+        console.error('Failed to initialize deployment:', error.response?.data?.message || error.message);
+        return;
+    }
+
+    // Step 2: Upload files
+    const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    progressBar.start(files.length, 0);
 
     try {
-        const response = await apiClient.post(`/apps/${associatedApp.id}/deploy`, { files });
-        console.log('Deployment successful!');
-        console.log(`URL: ${response.data.url}`);
+        for (const file of files) {
+            await apiClient.post(`/apps/${associatedApp.id}/upload`, file);
+            progressBar.increment();
+        }
+        progressBar.stop();
+        console.log('All files uploaded successfully.');
     } catch (error) {
-        console.error('Deployment failed:', error.response?.data?.message || error.message);
+        progressBar.stop();
+        console.error('File upload failed:', error.response?.data?.message || error.message);
+        return;
+    }
+
+    // Step 3: Monitor deployment status
+    const deploymentBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    deploymentBar.start(100, 0);
+
+    let deploymentComplete = false;
+    const maxAttempts = 30; // Limit polling to 30 attempts (e.g., 1 minute with 2-second intervals)
+    let attempts = 0;
+
+    while (!deploymentComplete && attempts < maxAttempts) {
+        try {
+            const statusResponse = await apiClient.get(`/apps/${associatedApp.id}/deployment-status`);
+            const { status, progress } = statusResponse.data;
+
+            deploymentBar.update(progress);
+
+            console.log(status, progress);
+
+            if (status === 'deployed') {
+                deploymentComplete = true;
+                deploymentBar.stop();
+                console.log('Deployment completed successfully.');
+                console.log(`URL: https://${associatedApp.subdomain}`);
+            } else if (status === 'failed') {
+                deploymentComplete = true;
+                deploymentBar.stop();
+                console.error('Deployment failed.');
+            } else {
+                attempts++;
+                await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
+            }
+        } catch (error) {
+            deploymentBar.stop();
+            console.error('Error checking deployment status:', error.response?.data?.message || error.message);
+            deploymentComplete = true; // Exit loop on error
+        }
+    }
+
+    if (!deploymentComplete) {
+        deploymentBar.stop();
+        console.error('Deployment status polling timed out.');
     }
 };
 
+// Rollback command
 const rollbackDeployment = async () => {
     const apps = loadApps();
     const currentDir = process.cwd();
@@ -130,6 +182,7 @@ const rollbackDeployment = async () => {
     }
 };
 
+// Deployment status command
 const deploymentStatus = async () => {
     const apps = loadApps();
     const currentDir = process.cwd();
@@ -156,6 +209,5 @@ const deploymentStatus = async () => {
         console.error('Failed to fetch deployment status:', error.response?.data?.message || error.message);
     }
 };
-
 
 module.exports = { rollbackDeployment, deploy, deploymentStatus };

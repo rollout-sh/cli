@@ -1,8 +1,5 @@
-
-
 const inquirer = require('inquirer').default;
 const apiClient = require('../utils/api');
-// const { default: open } = await import('open'); // Dynamic import for ES modules
 
 const openUrl = async (url) => {
     try {
@@ -16,7 +13,7 @@ const openUrl = async (url) => {
 
 
 const billing = async () => {
-    
+
     try {
         const response = await apiClient.get('/billing/status');
         console.log('Billing Status:');
@@ -86,51 +83,6 @@ const addPaymentMethod = async () => {
     }
 };
 
-
-
-
-// const upgradePlan = async () => {
-//     try {
-//         const response = await apiClient.get('/plans'); // Fetch plans
-//         const plans = response.data.map((plan) => ({
-//             name: `${plan.name} ($${plan.price}/month)`,
-//             value: plan.id,
-//         }));
-
-//         const answers = await inquirer.prompt([
-//             {
-//                 type: 'list',
-//                 name: 'plan_id',
-//                 message: 'Choose a plan to upgrade:',
-//                 choices: plans,
-//             },
-//         ]);
-
-//         // Prompt for card details
-//         const cardDetails = await inquirer.prompt([
-//             { type: 'input', name: 'card_number', message: 'Card Number:' },
-//             { type: 'input', name: 'exp_month', message: 'Expiry Month (MM):' },
-//             { type: 'input', name: 'exp_year', message: 'Expiry Year (YYYY):' },
-//             { type: 'input', name: 'cvc', message: 'CVC:' },
-//         ]);
-
-//         // Send upgrade request
-//         const upgradeResponse = await apiClient.post('/billing/subscribe', {
-//             plan_id: answers.plan_id,
-//             card: {
-//                 card_number: cardDetails.card_number,
-//                 exp_month: cardDetails.exp_month,
-//                 exp_year: cardDetails.exp_year,
-//                 cvc: cardDetails.cvc,
-//             },
-//         });
-
-//         console.log('Subscription updated successfully!');
-//         console.log(`New Plan: ${upgradeResponse.data.plan.name}`);
-//     } catch (error) {
-//         console.error('Failed to upgrade plan:', error.response?.data?.message || error.message);
-//     }
-// };
 const upgradePlan = async () => {
     try {
         // Fetch available plans
@@ -157,5 +109,68 @@ const upgradePlan = async () => {
     }
 };
 
+const cancelSubscription = async () => {
+    try {
+        const confirmation = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirm',
+                message: 'Are you sure you want to cancel your subscription?',
+            },
+        ]);
 
-module.exports = { billing, upgradePlan, addPaymentMethod, retryIncompletePayment};
+        if (!confirmation.confirm) {
+            console.log('Subscription cancellation aborted.');
+            return;
+        }
+
+        const response = await apiClient.post('/billing/cancel');
+        console.log(response.data.message);
+    } catch (error) {
+        console.error('Failed to cancel subscription:', error.response?.data?.message || error.message);
+    }
+};
+
+const changeSubscription = async () => {
+    try {
+        const plansResponse = await apiClient.get('/billing/plans');
+        const plans = plansResponse.data.plans.map((plan) => ({
+            name: `${plan.name} ($${plan.price}/month)`,
+            value: plan.id,
+        }));
+
+        const answers = await inquirer.prompt([
+            { type: 'list', name: 'plan_id', message: 'Choose a new plan:', choices: plans },
+        ]);
+
+        const response = await apiClient.post('/billing/change', { plan_id: answers.plan_id });
+        console.log(response.data.message);
+    } catch (error) {
+        console.error('Failed to change subscription:', error.response?.data?.message || error.message);
+    }
+};
+
+const resumeSubscription = async () => {
+    try {
+        const confirmation = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirm',
+                message: 'Are you sure you want to resume your subscription?',
+            },
+        ]);
+
+        if (!confirmation.confirm) {
+            console.log('Subscription resumption aborted.');
+            return;
+        }
+
+        const response = await apiClient.post('/billing/resume');
+        console.log(response.data.message);
+    } catch (error) {
+        console.error('Failed to resume subscription:', error.response?.data?.message || error.message);
+    }
+};
+
+
+module.exports = { billing, upgradePlan, addPaymentMethod, retryIncompletePayment, cancelSubscription, changeSubscription, resumeSubscription };

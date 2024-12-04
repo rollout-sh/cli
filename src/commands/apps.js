@@ -22,6 +22,7 @@ const createApp = async () => {
 const listApps = async () => {
     try {
         const response = await apiClient.get('/apps');
+        console.log('Fetched apps from API:', apps);
         saveApps(response.data); // Cache apps locally
         console.log('Your Apps:');
         response.data.forEach((app, index) => {
@@ -57,7 +58,13 @@ const deleteApp = async () => {
 
 const associateApp = async () => {
     
-    const apps = loadApps();
+    let apps = loadApps();
+    if (!apps || apps.length === 0) {
+        console.log('Local cache is empty. Fetching apps from the API...');
+        const response = await apiClient.get('/apps');
+        apps = response.data;
+        saveApps(apps);
+    }
 
     if (apps.length === 0) {
         console.log('No apps found to associate.');

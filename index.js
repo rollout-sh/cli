@@ -14,7 +14,7 @@ const listDeployments = require('./src/commands/deployments');
 
 const { addDomain, listDomains, removeDomain }  = require('./src/commands/domains');
 
-const { billing, upgradePlan, addPaymentMethod, retryIncompletePayment } = require('./src/commands/billing');
+const { billing, upgradePlan, addPaymentMethod, retryIncompletePayment, cancelSubscription, changeSubscription, resumeSubscription } = require('./src/commands/billing');
 
 
 program.command('login').description('Log in to Rollout').action(login);
@@ -27,6 +27,9 @@ program.command('apps:create').description('Create a new app').action(createApp)
 program.command('apps:list').description('List all apps').action(listApps);
 program.command('apps:delete').description('Delete an app').action(deleteApp);
 program.command('apps:associate').description('Associate a directory with an app').action(associateApp);
+
+
+
 
 program.command('deploy').description('Deploy static files to an app').action(deploy);
 program.command('deployments:list').description('List all deployments').action(listDeployments);
@@ -43,7 +46,9 @@ program.command('billing:status').description('View billing status').action(bill
 program.command('billing:payment-method').description('Add a new payment method').action(addPaymentMethod);
 program.command('billing:retry-incomplete').description('Retry incomplete payments').action(retryIncompletePayment);
 program.command('billing:upgrade').description('Upgrade to a new plan').action(upgradePlan);
-
+program.command('billing:cancel').description('Cancel subscription').action(cancelSubscription);
+program.command('billing:change').description('Change subscription').action(changeSubscription);
+program.command('billing:resume').description('Resume subscription').action(resumeSubscription);
 
 
 program.parse(process.argv);
