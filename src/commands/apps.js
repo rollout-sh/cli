@@ -1,5 +1,5 @@
 const inquirer = require('inquirer').default;
-const apiClient = require('../utils/api');
+const { apiClient } = require('../utils/api');
 const { saveApps, loadApps } = require('../utils/storage');
 
 const createApp = async () => {
