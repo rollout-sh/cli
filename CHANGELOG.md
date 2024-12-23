@@ -1,3 +1,9 @@
+## 1.2.2 (2024-12-23)
+
+### Refactor
+
+- added version file
+
 ## 1.2.1 (2024-12-23)
 
 ### Refactor
