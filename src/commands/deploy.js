@@ -6,6 +6,8 @@ const inquirer = require('inquirer').default;
 const { loadApps } = require('../utils/storage');
 const { apiClient } = require('../utils/api');
 const { setDebug, debugLog } = require('../utils/debug');
+const login = require('./login');
+const { getToken } = require('../utils/config');
 
 
 const parseIgnoreFile = (dirPath) => {
@@ -64,6 +66,18 @@ const collectFiles = (dirPath, basePath = '', ignorePatterns = []) => {
 
 const deploy = async (options) => {
     if (options.debug) setDebug(true);
+
+    // Check for authentication
+    if (!getToken()) {
+        console.log('Please log in to deploy your application:');
+        await login(options);
+        
+        // Verify if login was successful
+        if (!getToken()) {
+            console.error('Authentication failed. Unable to proceed with deployment.');
+            return;
+        }
+    }
 
     const apps = loadApps();
     const currentDir = process.cwd();
