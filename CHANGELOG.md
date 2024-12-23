@@ -1,3 +1,9 @@
+## 1.2.1 (2024-12-23)
+
+### Refactor
+
+- added more config to cz
+
 ## 1.2.0 (2024-12-23)
 
 ### Feat
