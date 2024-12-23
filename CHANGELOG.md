@@ -1,3 +1,18 @@
+## 1.2.0 (2024-12-23)
+
+### Feat
+
+- updated deployment proocess
+- created billing commandds
+- added rolling back option for deployments
+- added domain support
+
+### Refactor
+
+- called login in case credentials are not found
+- added logging to check debugs
+- converted all logs to debug
+
 ## 1.1.1 (2024-11-28)
 
 ### Fix
