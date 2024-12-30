@@ -1,10 +1,6 @@
 const { setDebug, debugLog } = require('../utils/debug');
 
 const baseCommand = async (options) => {
-    if (options.debug) {
-        setDebug(true);
-        debugLog('Debug mode enabled');
-    }
 
     const fs = require('fs');
     const path = require('path');
@@ -14,6 +10,12 @@ const baseCommand = async (options) => {
 
     console.log(`Rollout CLI version: ${version}`);
 
+    if (options.debug) {
+        setDebug(true);
+        debugLog('Debug mode enabled');
+    }
+
+    
 };
 
 module.exports = { baseCommand };
