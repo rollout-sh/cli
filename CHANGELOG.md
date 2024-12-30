@@ -1,3 +1,9 @@
+## 1.2.3 (2024-12-30)
+
+### Fix
+
+- tested and updated login command
+
 ## 1.2.2 (2024-12-23)
 
 ### Refactor
