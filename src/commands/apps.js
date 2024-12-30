@@ -4,6 +4,13 @@ const { saveApps, loadApps } = require('../utils/storage');
 const { baseCommand } = require('./baseCommand');
 const { debugLog } = require('../utils/debug');
 
+/**
+ * This command is used to create a new app.
+ * It prompts the user for the app name if not provided in the options.
+ * @param {Object} options - The options object passed to the command.
+ * @param {boolean} options.debug - If true, enables debug mode.
+ * @param {string} options.name - The name of the app to be created.
+ */
 const createApp = async (options) => {
     await baseCommand(options);
 
@@ -20,12 +27,23 @@ const createApp = async (options) => {
         const response = await apiClient.post('/apps', { name: appName });
         console.log('App created successfully!');
         console.log(`Name: ${response.data.name}`);
+        console.log(`Slug: ${response.data.slug}`);
         console.log(`Subdomain: ${response.data.subdomain}`);
+        
+        // Fetch updated app list after creation
+        const updatedResponse = await apiClient.get('/apps');
+        saveApps(updatedResponse.data);
     } catch (error) {
         console.error('Failed to create app:', error.response?.data?.message || error.message);
     }
 };
 
+/**
+ * This command is used to list all apps.
+ * It fetches the apps from the API and caches them locally.
+ * @param {Object} options - The options object passed to the command.
+ * @param {boolean} options.debug - If true, enables debug mode.
+ */
 const listApps = async (options) => {
 
     await baseCommand(options);
@@ -56,10 +74,14 @@ const listApps = async (options) => {
     }
 };
 
-
-
+/**
+ * This command is used to delete an app.
+ * It prompts the user to select an app to delete and confirms the deletion.
+ * @param {Object} options - The options object passed to the command.
+ * @param {boolean} options.debug - If true, enables debug mode.
+ */
 const deleteApp = async (options) => {
-    
+
     await baseCommand(options);
 
     let apps;
@@ -111,8 +133,10 @@ const deleteApp = async (options) => {
 };
 
 
-const associateApp = async () => {
+const associateApp = async (options) => {
     
+    await baseCommand(options);
+
     let apps = loadApps();
     if (!apps || apps.length === 0) {
         console.log('Local cache is empty. Fetching apps from the API...');
