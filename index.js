@@ -40,9 +40,24 @@ program.command('deployments:status').description('Get deployment status').optio
 
 
 
-program.command('domains:add').description('Add a custom domain').option('-d, --debug', 'Show debug information').action(addDomain);
-program.command('domains:list').description('List custom domains').option('-d, --debug', 'Show debug information').action(listDomains);
-program.command('domains:remove').description('Remove a custom domain').option('-d, --debug', 'Show debug information').action(removeDomain);
+
+program
+    .command('domains:add')
+    .description('Add a new domain (standalone or associated with an app)')
+    .option('-d, --debug', 'Show debug information')
+    .action(addDomain);
+
+program
+    .command('domains:list')
+    .description('List all domains or filter by app')
+    .option('-d, --debug', 'Show debug information')
+    .action(listDomains);
+
+program
+    .command('domains:remove')
+    .description('Remove a domain by ID')
+    .option('-d, --debug', 'Show debug information')
+    .action(removeDomain);
 
 program.command('billing:status').description('View billing status').option('-d, --debug', 'Show debug information').action(billing);
 program.command('billing:payment-method').description('Add a new payment method').option('-d, --debug', 'Show debug information').action(addPaymentMethod);

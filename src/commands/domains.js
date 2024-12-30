@@ -1,34 +1,54 @@
 const { loadApps } = require('../utils/storage');
 const inquirer = require('inquirer').default;
-const apiClient = require('../utils/api');
+const { apiClient } = require('../utils/api');
+
 
 const addDomain = async () => {
     const apps = loadApps();
-    const currentDir = process.cwd();
 
-    // Detect the associated app
-    const associatedApp = apps.find((app) => app.directory === currentDir);
+    // Prompt user to associate domain with an app or leave it standalone
+    const associateAnswer = await inquirer.prompt([
+        {
+            type: 'confirm',
+            name: 'associateWithApp',
+            message: 'Do you want to associate this domain with an app?',
+            default: false,
+        },
+    ]);
 
-    let appId;
-    if (associatedApp) {
-        appId = associatedApp.id;
-        console.log(`Detected app: ${associatedApp.name}`);
-    } else {
-        // Prompt for app ID if no associated app is found
-        const answers = await inquirer.prompt([
-            { type: 'input', name: 'app', message: 'App ID or Name:' },
+    let appId = null;
+
+    if (associateAnswer.associateWithApp) {
+        const appChoices = apps.map((app) => ({
+            name: app.name,
+            value: app.id,
+        }));
+
+        if (appChoices.length === 0) {
+            console.log('No apps found. Please create an app first.');
+            return;
+        }
+
+        const appAnswer = await inquirer.prompt([
+            {
+                type: 'list',
+                name: 'appId',
+                message: 'Select an app to associate the domain:',
+                choices: appChoices,
+            },
         ]);
-        appId = answers.app;
+
+        appId = appAnswer.appId;
     }
 
-    // Prompt for the custom domain
     const domainAnswer = await inquirer.prompt([
-        { type: 'input', name: 'domain', message: 'Custom Domain:' },
+        { type: 'input', name: 'domain', message: 'Enter the custom domain:' },
     ]);
 
     try {
-        const response = await apiClient.post(`/apps/${appId}/domains`, {
+        const response = await apiClient.post('/domains', {
             domain: domainAnswer.domain,
+            app_id: appId,
         });
 
         console.log('Domain added successfully!');
@@ -42,10 +62,43 @@ const addDomain = async () => {
 };
 
 const listDomains = async () => {
-    const answers = await inquirer.prompt([{ type: 'input', name: 'app', message: 'App ID:' }]);
+    const filterAnswer = await inquirer.prompt([
+        {
+            type: 'confirm',
+            name: 'filterByApp',
+            message: 'Do you want to filter domains by app?',
+            default: false,
+        },
+    ]);
+
+    let appId = null;
+
+    if (filterAnswer.filterByApp) {
+        const apps = loadApps();
+        const appChoices = apps.map((app) => ({
+            name: app.name,
+            value: app.id,
+        }));
+
+        if (appChoices.length === 0) {
+            console.log('No apps found. Please create an app first.');
+            return;
+        }
+
+        const appAnswer = await inquirer.prompt([
+            {
+                type: 'list',
+                name: 'appId',
+                message: 'Select an app to filter domains:',
+                choices: appChoices,
+            },
+        ]);
+
+        appId = appAnswer.appId;
+    }
 
     try {
-        const response = await apiClient.get(`/apps/${answers.app}/domains`);
+        const response = await apiClient.get('/domains', { params: { app_id: appId } });
         console.log('Domains:');
         response.data.forEach((domain, index) => {
             console.log(`${index + 1}. Domain: ${domain.domain} (Status: ${domain.status})`);
@@ -57,7 +110,7 @@ const listDomains = async () => {
 
 const removeDomain = async () => {
     const answers = await inquirer.prompt([
-        { type: 'input', name: 'domainId', message: 'Domain ID to remove:' },
+        { type: 'input', name: 'domainId', message: 'Enter the Domain ID to remove:' },
     ]);
 
     try {

@@ -2,9 +2,10 @@ const inquirer = require('inquirer').default;
 const { apiClient } = require('../utils/api');
 const { saveToken } = require('../utils/config');
 const { setDebug, debugLog } = require('../utils/debug');
+const { baseCommand } = require('./baseCommand');
 
 const login = async (options) => {
-    if (options.debug) setDebug(true);
+    await baseCommand(options); // This will set debug mode if -d or --debug is provided
 
     const answers = await inquirer.prompt([
         { type: 'input', name: 'email', message: 'Email:' },
