@@ -25,7 +25,11 @@ program.command('logout').description('Log out of Rollout').option('-d, --debug'
 program.command('token').description('Show stored token and user info').option('-d, --debug', 'Show debug information').action(showToken);
 
 
-program.command('apps:create').description('Create a new app').option('-d, --debug', 'Show debug information').action(createApp);
+program.command('apps:create').description('Create a new app')
+.option('-n, --name <name>', 'App Name')
+.option('-d, --debug', 'Show debug information')
+.action(createApp);
+
 program.command('apps:list').description('List all apps').option('-d, --debug', 'Show debug information').action(listApps);
 program.command('apps:delete').description('Delete an app').option('-d, --debug', 'Show debug information').action(deleteApp);
 program.command('apps:associate').description('Associate a directory with an app').option('-d, --debug', 'Show debug information').action(associateApp);

@@ -4,6 +4,12 @@ const { saveToken } = require('../utils/config');
 const { setDebug, debugLog } = require('../utils/debug');
 const { baseCommand } = require('./baseCommand');
 
+/**
+ * This command is used to login the user.
+ * It prompts the user for their email and password, and then sends a login request to the API.
+ * @param {Object} options - The options object.
+ * @param {boolean} options.debug - If true, enables debug mode.
+ */
 const login = async (options) => {
     await baseCommand(options); // This will set debug mode if -d or --debug is provided
 
