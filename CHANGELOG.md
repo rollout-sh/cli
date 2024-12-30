@@ -1,3 +1,15 @@
+## 1.2.2 (2024-12-30)
+
+### Refactor
+
+- added npm as provider
+
+## v1.2.1 (2024-12-30)
+
+### Refactor
+
+- changed order of console logs
+
 ## 1.2.3 (2024-12-30)
 
 ### Fix
