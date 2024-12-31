@@ -1,3 +1,14 @@
+## 1.2.6 (2024-12-31)
+
+### Fix
+
+- fixed issues in upload timeout and added better error handling
+
+### Refactor
+
+- added .env to gitignore
+- removed artifacts
+
 ## 1.2.5 (2024-12-30)
 
 ### Refactor
