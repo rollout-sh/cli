@@ -34,10 +34,8 @@ program.command('apps:list').description('List all apps').option('-d, --debug', 
 program.command('apps:delete').description('Delete an app').option('-d, --debug', 'Show debug information').action(deleteApp);
 program.command('apps:associate').description('Associate a directory with an app').option('-d, --debug', 'Show debug information').action(associateApp);
 
-
-
-
 program.command('deploy').description('Deploy static files to an app').option('-d, --debug', 'Show debug information').action(deploy);
+
 program.command('deployments:list').description('List all deployments').option('-d, --debug', 'Show debug information').action(listDeployments);
 program.command('deployments:rollback').description('Roll back to a previous deployment version').option('-d, --debug', 'Show debug information').action(rollbackDeployment);
 program.command('deployments:status').description('Get deployment status').option('-d, --debug', 'Show debug information').action(deploymentStatus);

@@ -2,7 +2,7 @@ const cliProgress = require('cli-progress');
 const fs = require('fs');
 const path = require('path');
 const micromatch = require('micromatch');
-const inquirer = require('inquirer').default;
+const JSZip = require('jszip');
 const { loadApps } = require('../utils/storage');
 const { apiClient } = require('../utils/api');
 const { setDebug, debugLog } = require('../utils/debug');
@@ -36,9 +36,17 @@ const collectFiles = (dirPath, basePath = '', ignorePatterns = []) => {
     const files = [];
     const items = fs.readdirSync(dirPath);
 
+    // Common binary file extensions
+    const binaryExtensions = [
+        '.jpg', '.jpeg', '.png', '.gif', '.ico', '.pdf', '.zip',
+        '.tar', '.gz', '.7z', '.mp3', '.mp4', '.wav', '.avi',
+        '.mov', '.webp', '.woff', '.woff2', '.ttf', '.eot'
+    ];
+
     items.forEach((item) => {
         const itemPath = path.join(dirPath, item);
         const relativePath = path.posix.join(basePath, item);
+        const ext = path.extname(item).toLowerCase();
 
         debugLog(`Checking: ${relativePath}`);
 
@@ -52,9 +60,20 @@ const collectFiles = (dirPath, basePath = '', ignorePatterns = []) => {
             files.push(...collectFiles(itemPath, relativePath, ignorePatterns));
         } else {
             try {
-                const content = fs.readFileSync(itemPath, 'utf8');
-                debugLog(`Including: ${relativePath}`);
-                files.push({ path: relativePath, content });
+                const buffer = fs.readFileSync(itemPath);
+                const isBinary = binaryExtensions.includes(ext);
+
+                // For binary files, use base64; for text files, use utf8
+                const content = isBinary
+                    ? buffer.toString('base64')
+                    : buffer.toString('utf8');
+
+                debugLog(`Including: ${relativePath} (${isBinary ? 'binary' : 'text'})`);
+                files.push({
+                    path: relativePath,
+                    content,
+                    isBinary
+                });
             } catch (error) {
                 console.error(`Error reading file ${itemPath}: ${error.message}`);
             }
@@ -64,6 +83,41 @@ const collectFiles = (dirPath, basePath = '', ignorePatterns = []) => {
     return files;
 };
 
+const uploadFiles = async (files, appId, progressBar, retries = 3) => {
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        progressBar.update(i, { file: file.path });
+
+        // Upload with retries
+        let lastError;
+        for (let attempt = 0; attempt < retries; attempt++) {
+            try {
+                debugLog(`Uploading file ${i + 1}/${files.length}: ${file.path} (Attempt ${attempt + 1})`);
+                await apiClient.post(`/apps/${appId}/upload-file`, {
+                    content: file.content,
+                    path: file.path,
+                    isBinary: file.isBinary
+                });
+                progressBar.update(i + 1);
+                lastError = null;
+                break;
+            } catch (error) {
+                lastError = error;
+                debugLog(`Upload failed: ${error.message}`);
+                if (attempt < retries - 1) {
+                    const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+                    debugLog(`Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        if (lastError) {
+            throw lastError;
+        }
+    }
+};
+
 const deploy = async (options) => {
     if (options.debug) setDebug(true);
 
@@ -71,8 +125,7 @@ const deploy = async (options) => {
     if (!getToken()) {
         console.log('Please log in to deploy your application:');
         await login(options);
-        
-        // Verify if login was successful
+
         if (!getToken()) {
             console.error('Authentication failed. Unable to proceed with deployment.');
             return;
@@ -81,7 +134,6 @@ const deploy = async (options) => {
 
     const apps = loadApps();
     const currentDir = process.cwd();
-
     const associatedApp = apps.find((app) => app.directory === currentDir);
 
     if (!associatedApp) {
@@ -98,69 +150,77 @@ const deploy = async (options) => {
 
     // Initialize deployment
     try {
-        const initResponse = await apiClient.post(`/apps/${associatedApp.id}/deploy/init`, { total_files: files.length });
+        const initResponse = await apiClient.post(`/apps/${associatedApp.id}/deploy/init`, {
+            total_files: files.length
+        });
         debugLog('Deployment initialized successfully:', initResponse.data);
     } catch (error) {
         console.error('Failed to initialize deployment:', error.response?.data?.message || error.message);
         return;
     }
 
-    // Upload files
-    const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    progressBar.start(files.length, 0);
+    // Upload files with progress bar
+    const progressBar = new cliProgress.SingleBar({
+        format: ' {bar} {percentage}% | {value}/{total} files | {file}',
+        barCompleteChar: '\u2588',
+        barIncompleteChar: '\u2591',
+    }, cliProgress.Presets.shades_classic);
+
+    progressBar.start(files.length, 0, { file: 'Starting...' });
 
     try {
-        for (const file of files) {
-            await apiClient.post(`/apps/${associatedApp.id}/upload`, file);
-            progressBar.increment();
-        }
+        await uploadFiles(files, associatedApp.id, progressBar);
+        progressBar.update(files.length, { file: 'Complete!' });
         progressBar.stop();
         console.log('All files uploaded successfully.');
+
+        // Monitor deployment status
+        const deploymentBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+        deploymentBar.start(100, 0);
+
+        let deploymentComplete = false;
+        const maxAttempts = 30;
+        let attempts = 0;
+
+        while (!deploymentComplete && attempts < maxAttempts) {
+            try {
+                const statusResponse = await apiClient.get(`/apps/${associatedApp.id}/deployment-status`);
+                const { status, progress } = statusResponse.data;
+
+                deploymentBar.update(progress);
+                debugLog('Deployment status:', { status, progress });
+
+                if (status === 'deployed') {
+                    deploymentComplete = true;
+                    deploymentBar.stop();
+                    console.log('Deployment completed successfully.');
+                    console.log(`URL: https://${associatedApp.subdomain}`);
+                } else if (status === 'failed') {
+                    deploymentComplete = true;
+                    deploymentBar.stop();
+                    console.error('Deployment failed.');
+                } else {
+                    attempts++;
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                }
+            } catch (error) {
+                deploymentBar.stop();
+                console.error('Error checking deployment status:', error.response?.data?.message || error.message);
+                deploymentComplete = true;
+            }
+        }
+
+        if (!deploymentComplete) {
+            deploymentBar.stop();
+            console.error('Deployment status polling timed out.');
+        }
     } catch (error) {
         progressBar.stop();
-        console.error('File upload failed:', error.response?.data?.message || error.message);
-        return;
-    }
-
-    // Monitor deployment status
-    const deploymentBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    deploymentBar.start(100, 0);
-
-    let deploymentComplete = false;
-    const maxAttempts = 30;
-    let attempts = 0;
-
-    while (!deploymentComplete && attempts < maxAttempts) {
-        try {
-            const statusResponse = await apiClient.get(`/apps/${associatedApp.id}/deployment-status`);
-            const { status, progress } = statusResponse.data;
-
-            deploymentBar.update(progress);
-            debugLog('Deployment status:', { status, progress });
-
-            if (status === 'deployed') {
-                deploymentComplete = true;
-                deploymentBar.stop();
-                console.log('Deployment completed successfully.');
-                console.log(`URL: https://${associatedApp.subdomain}`);
-            } else if (status === 'failed') {
-                deploymentComplete = true;
-                deploymentBar.stop();
-                console.error('Deployment failed.');
-            } else {
-                attempts++;
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-            }
-        } catch (error) {
-            deploymentBar.stop();
-            console.error('Error checking deployment status:', error.response?.data?.message || error.message);
-            deploymentComplete = true;
+        console.error('File upload failed:', error.message);
+        if (error.response?.data?.message) {
+            console.error('Server message:', error.response.data.message);
         }
-    }
-
-    if (!deploymentComplete) {
-        deploymentBar.stop();
-        console.error('Deployment status polling timed out.');
+        process.exit(1);
     }
 };
 

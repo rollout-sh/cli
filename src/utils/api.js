@@ -34,7 +34,7 @@ debugLog(`Using API URL: ${API_URL}`);
 // Create Axios client
 const apiClient = axios.create({
     baseURL: API_URL,
-    timeout: 5000,
+    timeout: 30000,
     headers: {
         'Content-Type': 'application/json',
     },
